@@ -176,6 +176,11 @@ const formSessionInstructionsField =
   document.querySelector<HTMLTextAreaElement>("#session-instructions")!;
 const formTemperatureField = document.querySelector<HTMLInputElement>("#temperature")!;
 const formVoiceSelection = document.querySelector<HTMLInputElement>("#voice")!;
+const formSendTextButton =
+  document.querySelector<HTMLButtonElement>("#text-input-send-button")!;
+const formUserTextInputField =
+  document.querySelector<HTMLButtonElement>("#text-input-content-instructions")!;
+
 
 let latestInputSpeechBlock: Element;
 
@@ -206,6 +211,10 @@ function setFormInputState(state: InputState) {
 
 function getSystemMessage(): string {
   return formSessionInstructionsField.value || "";
+}
+
+function getUserMessage(): string {
+  return formUserTextInputField.value || "";
 }
 
 function getTemperature(): number {
@@ -271,3 +280,14 @@ formEndpointField.addEventListener('change', async () => {
   guessIfIsAzureOpenAI();
 });
 guessIfIsAzureOpenAI();
+
+formSendTextButton.addEventListener("click", async () => {
+  if (recordingActive) {
+    makeNewTextBlock("<< Sending text content >>");
+    makeNewTextBlock(getUserMessage());
+    realtimeStreaming.send({
+      type: "conversation.item.create",
+      item: {type: "message", role: "user", content: [{ type: "input_text", text: getUserMessage() }] },
+    });
+  }
+});
