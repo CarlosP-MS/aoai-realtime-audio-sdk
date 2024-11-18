@@ -1,6 +1,15 @@
-body {
+ body {
   margin: 0;
   font-family: Arial, sans-serif;
+  background-color: rgb(255, 254, 254);
+  color: rgb(0, 0, 0);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+      background-color: rgb(42, 42, 42);
+      color: rgb(246, 244, 244);
+  }
 }
 
 .container {
@@ -13,18 +22,18 @@ body {
   flex: 6;
   overflow-y: auto;
   padding: 1rem;
-  background-color: #ebebeb;
   border: 1px solid #646cff;
   border-radius: 8px;
-  margin-right: 2rem;
+
 }
 
 .controls {
   flex: 2;
   display: flex;
+  overflow-y: auto;
   flex-direction: column;
-  justify-content: center;
-  align-items: flex-end;
+  align-items: flex-start;
+  margin: 20px;
 }
 
 .input-group {

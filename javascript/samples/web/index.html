@@ -9,8 +9,16 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Realtime API with openai-node SDK</title>
+  <style> 
+    .hidden { 
+      visibility: hidden; 
+      }
+
+      .expander-content { margin-top: 10px; /* Set margin for the content within the expander */ }
+  </style>
 </head>
 
 <body>
@@ -19,46 +27,53 @@
       <div class="container">
         <div id="received-text-container"></div>
         <div class="controls">
-          <div class="input-group">
-            <label for="endpoint">Endpoint</label>
-            <input id="endpoint" type="text" placeholder="Enter resource/endpoint URL" />
-            <div class="toggle-group">
-              <label for="azure-toggle">Azure OpenAI</label>
-              <input id="azure-toggle" type="checkbox" checked />
-            </div>
+          <details class="input-group">
+            <summary>Settings</summary>            
+            <div class="input-group expander-content">
+              <label for="endpoint">Endpoint</label>
+              <input id="endpoint" type="text" placeholder="Enter resource/endpoint URL" />
+              <div class="toggle-group">
+                <label for="azure-toggle">Azure OpenAI</label>
+                <input id="azure-toggle" type="checkbox" checked />
+              </div>
               <label for="api-key">API Key</label>
-            <input id="api-key" type="password" placeholder="Enter API key" />
-            <label for="deployment-or-model">Deployment</label>
-            <input id="deployment-or-model" type="text" placeholder="Enter deployment/model, e.g. gpt-4o-realtime-preview-2024-10-01" />
-          </div>
+              <input id="api-key" type="password" placeholder="Enter API key" />
+              <label for="deployment-or-model">Deployment</label>
+              <input id="deployment-or-model" type="text" placeholder="Enter deployment/model, e.g. gpt-4o-realtime-preview-2024-10-01" />
+              
+                <label for="session-instructions">System Message</label>
+                <textarea id="session-instructions" placeholder="Optional instructions for the session, e.g. 'You talk like a pirate.'" rows="4"></textarea>
+              
+              <div class="input-group">
+                <label for="temperature">Temperature</label>
+                <input id="temperature" type="number" min="0.6" max="1.2" step="0.05" placeholder="0.6-1.2 (default 0.8)"/>
+              </div>
+              <div class="input-group">
+                <label for="voice">Voice</label>
+                  <select id="voice">
+                    <option></option>
+                    <option>alloy</option>
+                    <option>echo</option>
+                    <option>shimmer</option>
+                  </select>
+              </div>
+            </div>
+          </details>
           <div class="input-group">
-          <div class="button-group">
-            <button id="start-recording" type="button">Record</button>
-            <button id="stop-recording" type="button" disabled="true">Stop</button>
+            <label>Microphone</label>              
+            <div class="button-group">
+              <button id="start-recording" type="button">Start</button>
+              <button id="stop-recording" type="button" disabled="true">Stop</button>
+            </div>
+            <div class="input-group">
+              <label for="text-input-content">Text Input</label>
+              <textarea id="text-input-content-instructions" placeholder="Optional text input to send during the conversation." rows="4"></textarea>
+              <div class="button-group">            
+                <button id="text-input-send-button" type="button">Send Text</button>
+              </div>
+            </div>
+            <i id="lightBulb" class="fa-regular fa-lightbulb fa-10x hidden" ></i>          
           </div>
-          <div class="input-group">
-            <label for="session-instructions">System Message</label>
-            <textarea id="session-instructions" placeholder="Optional instructions for the session, e.g. 'You talk like a pirate.'" rows="4"></textarea>
-          </div>
-          <div class="input-group">
-            <label for="temperature">Temperature</label>
-            <input id="temperature" type="number" min="0.6" max="1.2" step="0.05" placeholder="0.6-1.2 (default 0.8)"/>
-          </div>
-          <div class="input-group">
-            <label for="voice">Voice</label>
-              <select id="voice">
-                <option></option>
-                <option>alloy</option>
-                <option>echo</option>
-                <option>shimmer</option>
-              </select>
-          </div>
-          <div class="input-group">
-            <label for="text-input-content">Text Content</label>
-            <textarea id="text-input-content-instructions" placeholder="Optional text input." rows="4"></textarea>
-            <button id="text-input-send-button" type="button">Send Text Message</button>
-          </div>
-        </div>
       </div>
     </form>
   </div>

@@ -30,6 +30,95 @@ async function start_realtime(endpoint: string, apiKey: string, deploymentOrMode
   await Promise.all([resetAudio(true), handleRealtimeMessages()]);
 }
 
+// This is the function that we want the model to be able to call
+function switchLights(turnOn: boolean) {
+  if (turnOn) {
+    lightBulb.classList.remove("hidden");
+  }
+  else {
+    lightBulb.classList.add("hidden");
+  }
+}
+
+// This is the function that we want the model to be able to call
+function setLightColor(rgb: string) {
+  lightBulb.style.color = rgb;
+}
+
+async function setWindowsTheme(theme: string) : Promise<string> {
+  
+  const response = await fetch('http://localhost:5099/windowssettings/settheme/', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(theme)
+  });
+
+  if (response.ok)
+  {
+    return await response.text();
+  }
+  else
+  {
+    return "http request failed with " + response.status;
+  }
+}
+
+async function setWindowsAccentColor(color: string) : Promise<string> {
+  
+  const response = await fetch('http://localhost:5099/windowssettings/setaccentcolor/', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(color)
+  });
+
+  if (response.ok)
+  {
+    return await response.text();
+  }
+  else
+  {
+    return "http request failed with " + response.status;
+  }
+}
+
+async function setTaskbarVisibility(show: boolean) : Promise<string> {
+  
+  const response = await fetch('http://localhost:5099/windowssettings/settaskbarvisibility/', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(show)
+  });
+
+  if (response.ok)
+  {
+    return await response.text();
+  }
+  else
+  {
+    return "http request failed with " + response.status;
+  }
+}
+
+async function getProcessInfo() : Promise<string> {
+  
+  const response = await fetch('http://localhost:5099/windowssettings/GetProcessInfo/');
+
+  if (response.ok)
+  {
+    return await response.text();
+  }
+  else
+  {
+    return "http request failed with " + response.status;
+  }
+}
+
 function createConfigMessage() : SessionUpdateMessage {
 
   let configMessage : SessionUpdateMessage = {
@@ -40,7 +129,105 @@ function createConfigMessage() : SessionUpdateMessage {
       },
       input_audio_transcription: {
         model: "whisper-1"
-      }
+      },
+      tools: [
+        {
+            type: "function",
+            name: "switchLights",
+            description: "Switch lights function. Call this whenever the user asks for turning the lights on or off.",
+            parameters: {
+                type: "object",
+                properties: {
+                    turnOn: {
+                        type: "boolean",
+                        description: "Value indicating whether the lights should be turned on or off. Pass true for turning on the lights, or false for turning it off.",
+                    },
+                },
+                required: ["turnOn"],
+                additionalProperties: false,
+            }
+        },
+        {
+          type: "function",
+          name: "setLightColor",
+          description: "Function to set the color of the lights. Call this whenever the user asks for setting the lights color to a color.",
+          parameters: {
+              type: "object",
+              properties: {
+                  rgb: {
+                      type: "string",
+                      description: "Value indicating the light color to set to. Don't use color names or descriptions, but rather a valid css rgb expression like rgb(255,0,0) if the user asks for a strong red color.",
+                  },
+              },
+              required: ["rgb"],
+              additionalProperties: false,
+          },
+        },
+        {
+          type: "function",
+          name: "setWindowsTheme",
+          description: "Function to set the theme in Windows. Call this whenever the user asks for a windows computer theme change.",
+          parameters: {
+              type: "object",
+              properties: {
+                theme: {
+                    type: "string",
+                    description: "Value indicating the theme to set to. Use only values Light or Dark based on the user's request.",
+                },
+            },
+            required: ["theme"],
+              additionalProperties: false,
+          },
+        },       
+        {
+          type: "function",
+          name: "setWindowsAccentColor",
+          description: "Function to set the accent color in Windows. Call this whenever the user asks to change the accent color in their machine.",
+          parameters: {
+              type: "object",
+              properties: {
+                  rgb: {
+                      type: "string",
+                      description: "Value indicating the accent color to set to. Don't use color names or descriptions, but rather a valid css rgb expression like rgb(255,0,0) if the user asks for a strong red color.",
+                  },
+              },
+              required: ["rgb"],
+              additionalProperties: false,
+          },
+        },         
+        {
+          type: "function",
+          name: "setTaskbarVisibility",
+          description: "Function to set the visibility of the Taskbar in Windows. Call this whenever the user asks to change the taskbar visibility in their machine.",
+          parameters: {
+              type: "object",
+              properties: {
+                  show: {
+                      type: "boolean",
+                      description: "Value indicating whether the taskbar should be visible or not. Use true if the taskbar should be visible, or false to make it auto hide.",
+                  },
+              },
+              required: ["show"],
+              additionalProperties: false,
+          },
+        },
+        {
+            type: "function",
+            name: "getProcessInfo",
+            description: `Function to get the information about the top processes in terms of memory consumption in the machine. 
+                          Call this whenever the user asks about what might be using the most memory on their machine.
+                          When talking about the processes back to the user reference application names instead of process names if you 
+                          think you know the public names of those apps. Be brief and don't repeat all the process list information. Focus on 
+                          what you think is most relevant to the problem.`,
+            parameters: {
+                type: "object",
+                properties: {
+                },
+                required: [],
+                additionalProperties: false,
+            },          
+        },           
+    ]
     }
   };
 
@@ -67,9 +254,15 @@ async function handleRealtimeMessages() {
 
     switch (message.type) {
       case "session.created":
+        formReceivedTextContainer.replaceChildren();
         setFormInputState(InputState.ReadyToStop);
         makeNewTextBlock("<< Session Started >>");
         makeNewTextBlock();
+
+        // realtimeStreaming.send({
+        //   type: "response.create",
+        // });  
+
         break;
       case "response.audio_transcript.delta":
         appendToTextBlock(message.delta);
@@ -94,8 +287,84 @@ async function handleRealtimeMessages() {
       case "response.done":
         formReceivedTextContainer.appendChild(document.createElement("hr"));
         break;
+      case "response.function_call_arguments.done":
+        makeNewTextBlock(`<< Function Call Request >>`);
+        makeNewTextBlock(`Calling ${message.name} with arguments ${message.arguments} ...`);
+        switch (message.name) {
+          case "switchLights":
+            switchLights(JSON.parse(message.arguments)["turnOn"]);
+            realtimeStreaming.send({
+              type: "conversation.item.create",
+              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+            });          
+  
+            realtimeStreaming.send({
+              type: "response.create",
+            });                
+            break;
+          case "setLightColor":
+            setLightColor(JSON.parse(message.arguments)["rgb"]);
+            realtimeStreaming.send({
+              type: "conversation.item.create",
+              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+            });          
+  
+            realtimeStreaming.send({
+              type: "response.create",
+            });  
+            break;         
+          case "setWindowsTheme":
+            setWindowsTheme(JSON.parse(message.arguments)["theme"]);
+            realtimeStreaming.send({
+              type: "conversation.item.create",
+              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+            });             
+  
+            realtimeStreaming.send({
+              type: "response.create",
+            });  
+            break;    
+          case "setWindowsAccentColor":
+            setWindowsAccentColor(JSON.parse(message.arguments)["rgb"]);
+            realtimeStreaming.send({
+              type: "conversation.item.create",
+              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+            });          
+  
+            realtimeStreaming.send({
+              type: "response.create",
+            });  
+            break;         
+            case "setTaskbarVisibility":
+              setTaskbarVisibility(JSON.parse(message.arguments)["show"]);
+              realtimeStreaming.send({
+                type: "conversation.item.create",
+                item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+              });          
+    
+              realtimeStreaming.send({
+                type: "response.create",
+              });  
+              break;  
+            case "getProcessInfo":
+                let data = await getProcessInfo();
+                realtimeStreaming.send({
+                  type: "conversation.item.create",
+                  item: {type: "function_call_output", call_id: message.call_id,  output: data },
+                });          
+      
+                realtimeStreaming.send({
+                  type: "response.create",
+                });  
+                break;                  
+          default:
+            break;
+        }
+        break;
       default:
         consoleLog = JSON.stringify(message, null, 2);
+        // makeNewTextBlock(`<< Message loop default block: >>`);
+        // makeNewTextBlock(consoleLog);
         break
     }
     if (consoleLog) {
@@ -180,6 +449,8 @@ const formSendTextButton =
   document.querySelector<HTMLButtonElement>("#text-input-send-button")!;
 const formUserTextInputField =
   document.querySelector<HTMLButtonElement>("#text-input-content-instructions")!;
+const lightBulb =
+  document.querySelector<HTMLButtonElement>("#lightBulb")!;
 
 
 let latestInputSpeechBlock: Element;
@@ -229,6 +500,7 @@ function makeNewTextBlock(text: string = "") {
   let newElement = document.createElement("p");
   newElement.textContent = text;
   formReceivedTextContainer.appendChild(newElement);
+  formReceivedTextContainer.scrollTop = formReceivedTextContainer.scrollHeight;
 }
 
 function appendToTextBlock(text: string) {
@@ -237,6 +509,7 @@ function appendToTextBlock(text: string) {
     makeNewTextBlock();
   }
   textElements[textElements.length - 1].textContent += text;
+  formReceivedTextContainer.scrollTop = formReceivedTextContainer.scrollHeight;  
 }
 
 formStartButton.addEventListener("click", async () => {
@@ -284,7 +557,7 @@ guessIfIsAzureOpenAI();
 formSendTextButton.addEventListener("click", async () => {
   if (recordingActive) {
     makeNewTextBlock("<< Sending text content >>");
-    makeNewTextBlock(getUserMessage());
+    // makeNewTextBlock(getUserMessage());
     realtimeStreaming.send({
       type: "conversation.item.create",
       item: {type: "message", role: "user", content: [{ type: "input_text", text: getUserMessage() }] },
