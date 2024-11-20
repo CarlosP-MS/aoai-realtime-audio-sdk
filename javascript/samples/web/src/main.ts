@@ -31,18 +31,60 @@ async function start_realtime(endpoint: string, apiKey: string, deploymentOrMode
 }
 
 // This is the function that we want the model to be able to call
-function switchLights(turnOn: boolean) {
+function switchLights(turnOn: boolean) : string {
   if (turnOn) {
     lightBulb.classList.remove("hidden");
   }
   else {
     lightBulb.classList.add("hidden");
   }
+
+  return "Light state changed."  
 }
 
 // This is the function that we want the model to be able to call
-function setLightColor(rgb: string) {
+function setLightColor(rgb: string) : string {
   lightBulb.style.color = rgb;
+  return "Light color changed."
+}
+
+async function closeProcess(id: number) : Promise<string> {  
+  const response = await fetch('http://localhost:5099/windowssettings/TerminateProcess/', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(id)
+  });
+
+  if (response.ok)
+  {
+    return await response.text();
+  }
+  else
+  {
+    return "http request failed with " + response.status;
+  }
+}
+
+async function startApp(name: string) : Promise<string> {
+  
+  const response = await fetch('http://localhost:5099/windowssettings/LaunchApp/', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(name)
+  });
+
+  if (response.ok)
+  {
+    return await response.text();
+  }
+  else
+  {
+    return "http request failed with " + response.status;
+  }
 }
 
 async function setWindowsTheme(theme: string) : Promise<string> {
@@ -194,7 +236,45 @@ function createConfigMessage() : SessionUpdateMessage {
               required: ["rgb"],
               additionalProperties: false,
           },
-        },         
+        }, 
+        {
+          type: "function",
+          name: "terminateProcess",
+          description: `Function to terminate a process in Windows. Call this whenever the user asks to 
+          close an app. The id passed as parameter should be the process id from the list of processes. Make sure to 
+          ask for user confirmation before calling this function since it is not reversible.`,
+          parameters: {
+              type: "object",
+              properties: {
+                  id: {
+                      type: "number",
+                      description: "Value indicating the process id.",
+                  },
+              },
+              required: ["id"],
+              additionalProperties: false,
+          },
+        },                 
+        {
+          type: "function",
+          name: "launchApp",
+          description: `Function to launch an app in Windows. Call this whenever the user asks to 
+          start an app. The name passed as parameter should be the executable name for the most likely app 
+          the user wants (e.g. notepad, calc, mspaint, etc), or the app URI scheme for the app (e.g. microsoft.windows.camera:). 
+          If you aren't sure of the executable name, or if the request fails, you can try asking the user for the name to see if that helps. 
+          `,
+          parameters: {
+              type: "object",
+              properties: {
+                  name: {
+                      type: "string",
+                      description: "Value indicating the app name.",
+                  },
+              },
+              required: ["name"],
+              additionalProperties: false,
+          },
+        },           
         {
           type: "function",
           name: "setTaskbarVisibility",
@@ -290,12 +370,13 @@ async function handleRealtimeMessages() {
       case "response.function_call_arguments.done":
         makeNewTextBlock(`<< Function Call Request >>`);
         makeNewTextBlock(`Calling ${message.name} with arguments ${message.arguments} ...`);
+        let result = "";
         switch (message.name) {
           case "switchLights":
-            switchLights(JSON.parse(message.arguments)["turnOn"]);
+            result = switchLights(JSON.parse(message.arguments)["turnOn"]);
             realtimeStreaming.send({
               type: "conversation.item.create",
-              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+              item: {type: "function_call_output", call_id: message.call_id,  output: result },
             });          
   
             realtimeStreaming.send({
@@ -303,21 +384,43 @@ async function handleRealtimeMessages() {
             });                
             break;
           case "setLightColor":
-            setLightColor(JSON.parse(message.arguments)["rgb"]);
+            result = setLightColor(JSON.parse(message.arguments)["rgb"]);
             realtimeStreaming.send({
               type: "conversation.item.create",
-              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+              item: {type: "function_call_output", call_id: message.call_id,  output: result },
             });          
   
             realtimeStreaming.send({
               type: "response.create",
             });  
-            break;         
-          case "setWindowsTheme":
-            setWindowsTheme(JSON.parse(message.arguments)["theme"]);
+            break;
+          case "launchApp":
+            result = await startApp(JSON.parse(message.arguments)["name"]);
             realtimeStreaming.send({
               type: "conversation.item.create",
-              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+              item: {type: "function_call_output", call_id: message.call_id,  output: result },
+            });          
+  
+            realtimeStreaming.send({
+              type: "response.create",
+            });  
+            break;              
+          case "terminateProcess":
+            result = await closeProcess(JSON.parse(message.arguments)["id"]);
+            realtimeStreaming.send({
+              type: "conversation.item.create",
+              item: {type: "function_call_output", call_id: message.call_id,  output: result },
+            });          
+  
+            realtimeStreaming.send({
+              type: "response.create",
+            });  
+            break;                     
+          case "setWindowsTheme":
+            result = await setWindowsTheme(JSON.parse(message.arguments)["theme"]);
+            realtimeStreaming.send({
+              type: "conversation.item.create",
+              item: {type: "function_call_output", call_id: message.call_id,  output: result },
             });             
   
             realtimeStreaming.send({
@@ -325,10 +428,10 @@ async function handleRealtimeMessages() {
             });  
             break;    
           case "setWindowsAccentColor":
-            setWindowsAccentColor(JSON.parse(message.arguments)["rgb"]);
+            result = await setWindowsAccentColor(JSON.parse(message.arguments)["rgb"]);
             realtimeStreaming.send({
               type: "conversation.item.create",
-              item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+              item: {type: "function_call_output", call_id: message.call_id,  output: result },
             });          
   
             realtimeStreaming.send({
@@ -336,10 +439,10 @@ async function handleRealtimeMessages() {
             });  
             break;         
             case "setTaskbarVisibility":
-              setTaskbarVisibility(JSON.parse(message.arguments)["show"]);
+              result = await setTaskbarVisibility(JSON.parse(message.arguments)["show"]);
               realtimeStreaming.send({
                 type: "conversation.item.create",
-                item: {type: "function_call_output", call_id: message.call_id,  output: "" },
+                item: {type: "function_call_output", call_id: message.call_id,  output: result },
               });          
     
               realtimeStreaming.send({
